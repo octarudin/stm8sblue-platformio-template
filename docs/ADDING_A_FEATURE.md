@@ -69,6 +69,17 @@ Buat atau ubah module di `src/application/`. Use case melakukan urutan:
 
 Jangan menulis konfigurasi register dalam application.
 
+Jika use case berjalan periodik, daftarkan callback singkat ke cooperative
+scheduler dari `app_init()`:
+
+```c
+scheduler_add(sensor_task, 100U, 100U);
+```
+
+Callback task tidak boleh menggunakan `stm8_platform_delay_ms()`. Simpan state
+antar-eksekusi sebagai state privat modul dan segera kembalikan kontrol ke
+scheduler.
+
 ## 5. Hubungkan di composition root
 
 Panggil fungsi init hardware dari `stm8_platform_init()`.
@@ -95,6 +106,7 @@ Minimal verifikasi:
 - Periferal tidak terhubung.
 - Timeout atau bus macet jika relevan.
 - Interaksi dengan UART/timer/periferal lain.
+- Waktu eksekusi task dan respons task lain ketika use case berjalan.
 
 ## Definition of done
 
@@ -103,6 +115,7 @@ Sebuah feature dianggap selesai jika:
 - Interface dan implementasi dipisahkan.
 - Application tidak mengakses SPL secara langsung.
 - Pin dan resource timer didokumentasikan.
+- Callback scheduler tidak blocking dan memenuhi periodenya.
 - Build berhasil dengan warning yang dipahami.
 - Ukuran firmware masih muat.
 - Perilaku diuji pada hardware.

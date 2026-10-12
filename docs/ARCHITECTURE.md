@@ -8,6 +8,7 @@ dependency-injection container, atau abstraksi berat.
 ```text
 main.c
 ├── application
+│   └── cooperative scheduler
 └── stm8_platform façade
     ├── board STM8SBlue
     └── peripheral drivers
@@ -25,6 +26,9 @@ main.c
 ├── include/
 │   ├── application/
 │   │   └── app.h
+│   ├── kernel/
+│   │   ├── cooperative_scheduler.h
+│   │   └── scheduler_config.h
 │   └── platform/
 │       ├── stm8_platform.h
 │       ├── platform_features.h
@@ -32,7 +36,7 @@ main.c
 │       │   └── stm8sblue_board.h
 │       └── drivers/
 │           ├── clock_driver.h
-│           ├── tim4_delay.h
+│           ├── tim4_time.h
 │           ├── uart1_driver.h
 │           └── ...
 ├── src/
@@ -40,13 +44,15 @@ main.c
 │   ├── stm8s_conf.h
 │   ├── application/
 │   │   └── app.c
+│   ├── kernel/
+│   │   └── cooperative_scheduler.c
 │   └── platform/
 │       ├── stm8_platform.c
 │       ├── board/
 │       │   └── stm8sblue_board.c
 │       └── drivers/
 │           ├── clock_driver.c
-│           ├── tim4_delay.c
+│           ├── tim4_time.c
 │           ├── uart1_driver.c
 │           └── ...
 ├── lib/
@@ -63,9 +69,17 @@ register atau business logic di sini.
 
 ### `src/application/`
 
-Berisi use case dan alur aplikasi. Contoh saat ini mengirim heartbeat UART dan
-membalik LED setiap satu detik. Application menggunakan API façade
-`stm8_platform_*` dan tidak memanggil SPL secara langsung.
+Berisi use case dan alur aplikasi. Contoh saat ini mendaftarkan task heartbeat
+UART dan LED ke scheduler. Application menggunakan API façade
+`stm8_platform_*`, memakai scheduler sebagai layanan kernel, dan tidak memanggil
+SPL secara langsung.
+
+### `src/kernel/`
+
+Berisi cooperative scheduler yang bebas dari SPL dan detail STM8. Scheduler
+menyimpan tabel task statis, memeriksa deadline 16-bit, dan memanggil callback
+dari main loop. Scheduler menerima nilai waktu dari platform sehingga logikanya
+tidak memiliki dependensi hardware.
 
 ### `src/platform/stm8_platform.c`
 
@@ -83,7 +97,7 @@ Satu modul memiliki satu periferal atau satu layanan hardware. Contoh:
 
 - `clock_driver.c`: konfigurasi HSI;
 - `uart1_driver.c`: konfigurasi dan TX UART1;
-- `tim4_delay.c`: konfigurasi TIM4 dan delay blocking;
+- `tim4_time.c`: clock sistem 1 ms, ISR TIM4, dan delay blocking;
 - `watchdog_driver.c`: IWDG dan WWDG.
 
 Hanya layer ini dan layer board yang boleh memanggil fungsi SPL.
@@ -118,6 +132,7 @@ implementasi fungsi besar di header.
 | Membuat objek platform dan main loop | `src/main.c` |
 | Use case/business logic | `src/application/*.c` |
 | Interface application | `include/application/*.h` |
+| Scheduler dan konfigurasi task | `src/kernel/` dan `include/kernel/` |
 | Façade dan urutan init | `src/platform/stm8_platform.c` |
 | Interface façade | `include/platform/stm8_platform.h` |
 | Implementasi satu periferal SPL | `src/platform/drivers/*.c` |
@@ -130,7 +145,9 @@ implementasi fungsi besar di header.
 ## Arah dependensi
 
 ```text
-application → stm8_platform façade → board/drivers → SPL
+application → scheduler + stm8_platform façade
+scheduler   → tidak bergantung pada hardware
+platform    → board/drivers → SPL
 domain      → tidak bergantung pada hardware
 main        → application + stm8_platform façade
 ```
@@ -144,7 +161,7 @@ mock atau dukungan platform kedua benar-benar diperlukan.
 Satu pin atau timer hanya boleh dimiliki satu modul:
 
 - PB5: `stm8sblue_board.c`, LED bawaan;
-- TIM4: `tim4_delay.c`, layanan delay;
+- TIM4: `tim4_time.c`, clock scheduler dan layanan delay;
 - UART1: `uart1_driver.c`, serial TX.
 
 Jangan mengubah konfigurasi resource tersebut dari application atau driver lain
@@ -159,3 +176,7 @@ tanpa memindahkan kepemilikannya dan memperbarui dokumentasi.
 
 ISR sebaiknya membersihkan flag, menyimpan data minimum, dan memberi tanda ke
 main loop. Jangan menjalankan business logic atau operasi blocking di ISR.
+
+Callback scheduler juga berjalan di main loop, bukan ISR. Karena scheduler
+bersifat cooperative, setiap callback harus cepat selesai dan tidak boleh
+memakai delay blocking.

@@ -18,13 +18,63 @@ menjalankan `app_run_once()` terus-menerus.
 ### `void app_init(const stm8_platform_t *platform)`
 
 Dipanggil satu kali setelah platform selesai diinisialisasi. Contoh bawaan
-mengirim pesan startup melalui UART1.
+menginisialisasi scheduler, mendaftarkan task LED dan heartbeat, lalu mengirim
+pesan startup melalui UART1.
 
 ### `void app_run_once(const stm8_platform_t *platform)`
 
-Menjalankan satu iterasi use case. Contoh bawaan mengirim heartbeat, membalik
-LED, lalu melakukan delay blocking 1000 ms. Kondisi LED berubah setiap satu
-detik; satu periode ON/OFF lengkap berlangsung sekitar dua detik.
+Membaca clock platform dan menjalankan satu iterasi cooperative scheduler.
+Fungsi tidak melakukan delay dan harus dipanggil sesering mungkin dari main
+loop.
+
+## Cooperative Scheduler API
+
+Deklarasi: `include/kernel/cooperative_scheduler.h`
+
+Implementasi: `src/kernel/cooperative_scheduler.c`
+
+### `void scheduler_init(uint16_t now_ms)`
+
+Mengosongkan tabel task dan menyimpan waktu referensi untuk pendaftaran task.
+Panggil satu kali sebelum `scheduler_add()`.
+
+### `scheduler_task_id_t scheduler_add(...)`
+
+```c
+scheduler_task_id_t scheduler_add(
+    scheduler_task_fn_t task,
+    uint16_t period_ms,
+    uint16_t initial_delay_ms
+);
+```
+
+Mendaftarkan callback `void task(void)` ke tabel statis. Period dan initial
+delay harus 1..32767 ms. Mengembalikan ID task atau
+`SCHEDULER_INVALID_TASK_ID` jika parameter tidak valid atau tabel penuh.
+
+### `uint8_t scheduler_set_enabled(...)`
+
+```c
+uint8_t scheduler_set_enabled(
+    scheduler_task_id_t task_id,
+    uint8_t enabled,
+    uint16_t now_ms
+);
+```
+
+Menonaktifkan atau mengaktifkan task. Task yang diaktifkan kembali dijadwalkan
+setelah satu periode. Mengembalikan `1` jika ID valid.
+
+### `void scheduler_run(uint16_t now_ms)`
+
+Menjalankan setiap task yang jatuh tempo paling banyak satu kali. Eksekusi yang
+terlewat tidak diputar ulang; deadline berikutnya tetap mempertahankan fase.
+
+### `uint8_t scheduler_task_count(void)`
+
+Mengembalikan jumlah slot task yang sudah didaftarkan.
+
+Kontrak timing dan contoh lengkap tersedia di `docs/SCHEDULER.md`.
 
 ## Platform Façade API
 
@@ -78,6 +128,16 @@ void stm8_platform_delay_ms(
 Menunggu secara blocking menggunakan TIM4. Konfigurasi default memberikan tick
 nominal 1 ms pada HSI 16 MHz. Akurasi mengikuti clock aktual MCU. Jangan panggil
 dari ISR.
+
+### `uint16_t stm8_platform_millis(...)`
+
+```c
+uint16_t stm8_platform_millis(const stm8_platform_t *platform);
+```
+
+Mengembalikan clock TIM4 dalam milidetik. Nilai wrap setiap 65,536 detik dan
+menjadi sumber waktu scheduler. Mengembalikan `0` ketika TIM4 tidak dibangun
+atau tidak aktif. Gunakan dari main context, bukan ISR.
 
 ### `void stm8_platform_led_toggle(...)`
 
@@ -146,8 +206,10 @@ Driver hanya dipanggil oleh façade platform atau modul platform lain.
 | SPI | `spi_driver_init()` | Master mode 0, MSB-first, CPU/16 |
 | TIM1 | `tim1_driver_init()` | Time base default template |
 | TIM2 | `tim2_driver_init()` | Time base default template |
-| TIM4 | `tim4_delay_init()` | Menyiapkan tick delay |
-| TIM4 | `tim4_delay_wait_ms()` | Delay blocking |
+| TIM4 | `tim4_time_init()` | Menyiapkan clock dan interrupt update TIM4 |
+| TIM4 | `tim4_time_start()` | Mengaktifkan interrupt global setelah startup |
+| TIM4 | `tim4_time_millis()` | Membaca clock sistem 16-bit secara atomik |
+| TIM4 | `tim4_time_delay_ms()` | Delay blocking berbasis clock interrupt |
 | UART1 | `uart1_driver_init()` | UART1 TX 8-N-1 |
 | UART1 | `uart1_driver_write()` | TX string menggunakan polling |
 | IWDG | `iwdg_driver_init()` | Mengaktifkan IWDG; tidak dapat dimatikan tanpa reset |

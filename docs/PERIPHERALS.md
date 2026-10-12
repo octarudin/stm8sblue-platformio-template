@@ -12,7 +12,7 @@
 | ADC1 | `STM8_FEATURE_ADC1` | Ya | Ya | Tidak | Default single conversion channel 0 |
 | TIM1 | `STM8_FEATURE_TIM1` | Ya | Ya | Tidak | Counter default; PWM/capture belum dibungkus |
 | TIM2 | `STM8_FEATURE_TIM2` | Ya | Ya | Tidak | Counter default; PWM/capture belum dibungkus |
-| TIM4 | `STM8_FEATURE_TIM4` | Ya | Ya | Ya | Digunakan oleh delay blocking |
+| TIM4 | `STM8_FEATURE_TIM4` | Ya | Ya | Ya | Clock 1 ms scheduler dan delay blocking |
 | UART1 | `STM8_FEATURE_UART1` | Ya | Ya | Ya | TX polling; RX belum dibungkus |
 | I2C | `STM8_FEATURE_I2C` | Ya | Ya | Tidak | Default master-capable 100 kHz |
 | SPI | `STM8_FEATURE_SPI` | Ya | Ya | Tidak | Default master mode 0, CPU/16 |
@@ -66,9 +66,10 @@ IWDG dan WWDG merupakan kasus khusus:
 
 ## Konflik resource
 
-- TIM4 digunakan oleh `stm8_platform_delay_ms()`.
+- TIM4 dimiliki `tim4_time.c` sebagai clock scheduler dan layanan delay.
 - PB5 dimiliki modul board sebagai LED bawaan active-low.
 - Jangan mengubah prescaler/period TIM4 dari modul lain tanpa memperbarui layanan waktu.
+- TIM4 update memakai interrupt vector 23; jangan definisikan ISR kedua untuk vector yang sama.
 - UART1 memakai PD5/PD6.
 - SPI, I2C, timer output, ADC, dan BEEP bergantung pada pin serta alternate function MCU.
 - Dokumentasikan kepemilikan pin dan timer pada setiap proyek turunan.

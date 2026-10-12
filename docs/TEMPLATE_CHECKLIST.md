@@ -8,7 +8,7 @@ Template sudah memiliki fondasi yang dapat di-clone:
 - Versi platform PlatformIO dipin.
 - Clean Architecture ringan.
 - Feature flags untuk menjaga ukuran firmware.
-- Contoh buildable untuk UART1 dan TIM4.
+- Contoh buildable untuk UART1, TIM4, LED, dan cooperative scheduler.
 - Dokumentasi struktur, API, periferal, dan penambahan fitur.
 
 Namun statusnya masih **template eksperimental**, belum template produksi universal.
@@ -37,12 +37,13 @@ Namun statusnya masih **template eksperimental**, belum template produksi univer
 ## Kekurangan teknis saat ini
 
 - UART1 baru memiliki API TX blocking; RX, interrupt, ring buffer, dan timeout belum tersedia.
-- TIM4 delay masih blocking dan belum menyediakan scheduler/non-blocking tick.
+- Scheduler masih cooperative tanpa priority atau preemption; callback yang lama menambah latency task lain.
+- UART1 TX masih blocking walaupun clock TIM4 tetap berjalan melalui interrupt.
 - GPIO, ADC1, I2C, SPI, dan timer lain baru memiliki startup scaffolding, belum API operasional lengkap.
 - Error handling belum distandardisasi.
 - Tidak ada perlindungan pointer `NULL` untuk menghemat kode.
 - Tidak ada pengujian otomatis atau hardware-in-the-loop.
-- Konfigurasi beberapa periferal masih hard-coded dalam `stm8_platform.c`.
+- Konfigurasi beberapa periferal masih berupa default hard-coded dalam driver masing-masing.
 - Application contoh masih menerima tipe platform secara langsung; application ports belum diterapkan.
 
 ## Kriteria template stabil

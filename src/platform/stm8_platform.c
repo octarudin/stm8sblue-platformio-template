@@ -10,7 +10,7 @@
 #include "platform/drivers/spi_driver.h"
 #include "platform/drivers/tim1_driver.h"
 #include "platform/drivers/tim2_driver.h"
-#include "platform/drivers/tim4_delay.h"
+#include "platform/drivers/tim4_time.h"
 #include "platform/drivers/uart1_driver.h"
 #include "platform/drivers/watchdog_driver.h"
 
@@ -68,7 +68,7 @@ void stm8_platform_init(const stm8_platform_t *platform)
 
 #if STM8_FEATURE_TIM4
     if (stm8_platform_is_enabled(platform, STM8_PERIPHERAL_TIM4)) {
-        tim4_delay_init(platform->tim4_period);
+        tim4_time_init(platform->tim4_period);
     }
 #endif
 
@@ -115,6 +115,12 @@ void stm8_platform_init(const stm8_platform_t *platform)
     }
 #endif
 
+#if STM8_FEATURE_TIM4
+    if (stm8_platform_is_enabled(platform, STM8_PERIPHERAL_TIM4)) {
+        tim4_time_start();
+    }
+#endif
+
     /* ITC dan RST adalah layanan sistem; tidak memiliki global enable. */
     (void)platform;
 }
@@ -140,11 +146,24 @@ void stm8_platform_delay_ms(const stm8_platform_t *platform, uint16_t millisecon
         return;
     }
 
-    tim4_delay_wait_ms(milliseconds);
+    tim4_time_delay_ms(milliseconds);
 #else
     (void)platform;
     (void)milliseconds;
 #endif
+}
+
+uint16_t stm8_platform_millis(const stm8_platform_t *platform)
+{
+#if STM8_FEATURE_TIM4
+    if (stm8_platform_is_enabled(platform, STM8_PERIPHERAL_TIM4)) {
+        return tim4_time_millis();
+    }
+#else
+    (void)platform;
+#endif
+
+    return 0U;
 }
 
 void stm8_platform_led_toggle(const stm8_platform_t *platform)

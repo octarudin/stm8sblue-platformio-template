@@ -91,6 +91,14 @@ void stm8_platform_uart1_write(const stm8_platform_t *platform, const char *text
 void stm8_platform_delay_ms(const stm8_platform_t *platform, uint16_t milliseconds);
 
 /**
+ * Mengembalikan clock sistem dalam milidetik dari TIM4.
+ *
+ * Nilai 16-bit wrap setiap 65,536 detik. Fungsi mengembalikan 0 jika TIM4
+ * tidak dibangun atau tidak aktif.
+ */
+uint16_t stm8_platform_millis(const stm8_platform_t *platform);
+
+/**
  * Membalik kondisi LED bawaan STM8SBlue.
  *
  * Fungsi menjadi no-op jika GPIO tidak dibangun atau tidak aktif. LED

@@ -8,7 +8,8 @@ Template ini menyediakan:
 - Objek konfigurasi platform tunggal.
 - Pemilihan driver SPL secara compile-time agar muat dalam Flash 8 KB.
 - Pemisahan application dan platform/hardware.
-- Contoh UART1, delay TIM4, dan LED bawaan yang siap dijalankan.
+- Contoh UART1, clock/delay TIM4, dan LED bawaan yang siap dijalankan.
+- Cooperative scheduler tanpa heap dengan tabel task berukuran tetap.
 - Driver periferal terpisah agar façade platform tetap ringkas.
 - Scaffolding seluruh periferal STM8S103F3P6.
 
@@ -116,28 +117,52 @@ Feature compile-time menentukan kode yang masuk ke firmware, sedangkan field `en
 Implementasi bawaan di `src/application/app.c`:
 
 - Mengirim `STM8S template ready` sekali saat startup.
-- Mengirim `Application heartbeat` setiap sekitar satu detik.
-- Membalik kondisi LED bawaan PB5 setiap satu detik. Karena satu siklus terdiri
+- Menjalankan task heartbeat UART setiap sekitar satu detik.
+- Menjalankan task LED PB5 setiap satu detik. Karena satu siklus terdiri
   dari ON dan OFF, periode kedip lengkapnya sekitar dua detik.
+- Menggunakan TIM4 interrupt sebagai clock sistem 1 ms.
 
 File tersebut sengaja sederhana dan merupakan tempat pertama yang diganti saat membuat proyek baru.
 
-## Pembagian kode platform
+## Cooperative scheduler
 
-```text
-src/platform/
-├── stm8_platform.c       # façade dan urutan inisialisasi
-├── board/
-│   └── stm8sblue_board.c # pin/resource khusus board, termasuk LED PB5
-└── drivers/
-    ├── clock_driver.c
-    ├── tim4_delay.c
-    ├── uart1_driver.c
-    └── ...               # satu modul untuk setiap periferal
+Task didaftarkan tanpa heap:
+
+```c
+scheduler_init(stm8_platform_millis(platform));
+scheduler_add(led_task, 1000U, 1000U);
+scheduler_add(heartbeat_task, 1000U, 1000U);
 ```
 
-Application hanya menggunakan API `stm8_platform_*`. Detail SPL berada dalam
-driver dan detail pin board berada dalam modul `board`.
+Main loop memanggil dispatcher sesering mungkin. Callback task tidak boleh
+memakai delay blocking. Jumlah slot dapat diubah melalui
+`include/kernel/scheduler_config.h`. Lihat [panduan scheduler](docs/SCHEDULER.md)
+untuk kontrak timing dan batasannya.
+
+## Pembagian kode
+
+```text
+src/
+├── application/          # task dan use case aplikasi
+├── kernel/
+│   └── cooperative_scheduler.c
+└── platform/
+    ├── stm8_platform.c       # façade dan urutan inisialisasi
+    ├── board/
+    │   └── stm8sblue_board.c # pin/resource khusus board, termasuk LED PB5
+    └── drivers/
+        ├── clock_driver.c
+        ├── tim4_time.c
+        ├── uart1_driver.c
+        └── ...               # satu modul untuk setiap periferal
+```
+
+Application memakai scheduler dan API `stm8_platform_*`. Scheduler bebas dari
+hardware, detail SPL berada dalam driver, dan detail pin berada dalam modul
+`board`.
+
+Build default setelah scheduler menggunakan sekitar 49 byte RAM dan 3645 byte
+Flash. Nilai dapat berubah mengikuti versi compiler dan feature yang aktif.
 
 ## Dokumentasi
 
@@ -145,6 +170,7 @@ driver dan detail pin board berada dalam modul `board`.
 - [Referensi fungsi/API](docs/API.md)
 - [Daftar periferal](docs/PERIPHERALS.md)
 - [Panduan membuat fitur baru](docs/ADDING_A_FEATURE.md)
+- [Cooperative scheduler](docs/SCHEDULER.md)
 - [Checklist publikasi template](docs/TEMPLATE_CHECKLIST.md)
 
 ## Perintah utama
@@ -171,6 +197,7 @@ pio device monitor
 - Hindari `printf()` jika fungsi konversi sederhana mencukupi.
 - Aktifkan hanya driver SPL yang digunakan.
 - Jangan melakukan proses berat di ISR.
+- Jangan menggunakan delay blocking di dalam callback scheduler.
 - Periksa penggunaan Flash/RAM pada setiap build.
 - IWDG dan WWDG tidak dapat dimatikan kembali melalui software setelah aktif.
 

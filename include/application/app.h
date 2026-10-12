@@ -11,8 +11,8 @@ void app_init(const stm8_platform_t *platform);
 /**
  * Menjalankan satu iterasi use case contoh.
  *
- * Implementasi bawaan mengirim pesan UART setiap satu detik dan dimaksudkan
- * sebagai titik awal yang diganti oleh aplikasi pengguna template.
+ * Implementasi bawaan menjalankan task LED dan heartbeat melalui cooperative
+ * scheduler. Fungsi tidak melakukan delay dan harus dipanggil sesering mungkin.
  */
 void app_run_once(const stm8_platform_t *platform);
 
